@@ -7,19 +7,23 @@ import OrbitCore
 struct OrbitApp: App {
     @NSApplicationDelegateAdaptor(OrbitDelegate.self) var delegate
     @StateObject private var state = AppState()
+    @StateObject private var updates = OrbitUpdateMonitor()
 
     var body: some Scene {
         Window("Orbit", id: "main") {
-            RootView().environmentObject(state).environmentObject(state.monitoring)
+            RootView().environmentObject(state).environmentObject(state.monitoring).environmentObject(updates)
                 .ignoresSafeArea(.container, edges: .top)
                 .frame(minWidth: 960, minHeight: 680)
                 .preferredColorScheme(.dark)
-                .onAppear { delegate.state = state; state.start(); runSmokeIfRequested() }
+                .onAppear { delegate.state = state; delegate.updates = updates; state.start(); updates.start(); runSmokeIfRequested() }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
         .defaultSize(width: 1200, height: 772)
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button(updates.isChecking ? "正在检查更新…" : "检查更新…") { Task { await updates.checkManually() } }.disabled(updates.isChecking)
+            }
             CommandGroup(after: .newItem) {
                 Button("扫描可清理文件") { state.tab = .clean; state.scanCleanup() }.keyboardShortcut("r")
                 Button("清理记录") { state.openHistory() }.keyboardShortcut("h", modifiers: [.command, .shift])
@@ -34,10 +38,10 @@ struct OrbitApp: App {
             }
         }
         Settings {
-            SettingsView().environmentObject(state)
+            SettingsView().environmentObject(state).environmentObject(updates)
         }.windowResizability(.contentMinSize)
         MenuBarExtra {
-            OrbitMenuContent(monitoring: state.monitoring).environmentObject(state)
+            OrbitMenuContent(monitoring: state.monitoring).environmentObject(state).environmentObject(updates)
         } label: {
             OrbitMenuLabel(monitoring: state.monitoring)
         }.menuBarExtraStyle(.window)
@@ -195,6 +199,7 @@ struct OrbitApp: App {
 
 private struct OrbitMenuContent: View {
     @EnvironmentObject var state: AppState
+    @EnvironmentObject var updates: OrbitUpdateMonitor
     @ObservedObject var monitoring: LiveMonitoring
     @Environment(\.openWindow) private var openWindow
     var body: some View {
@@ -213,6 +218,8 @@ private struct OrbitMenuContent: View {
             }
             Button("AI 工具清理") { openWindow(id: "main"); if !state.modalNotice { state.showAI = true }; NSApp.activate(ignoringOtherApps: true) }
             Button("打开 Orbit") { openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true) }
+            if let release = updates.availableRelease { Link("更新至 Orbit " + release.version, destination: release.url) }
+            else { Button(updates.isChecking ? "正在检查更新…" : "检查更新…") { Task { await updates.checkManually() } }.disabled(updates.isChecking) }
             Button("退出 Orbit") { NSApp.terminate(nil) }
         }.padding(16).frame(width: 260)
     }
@@ -228,10 +235,11 @@ private struct OrbitMenuLabel: View {
 
 final class OrbitDelegate: NSObject, NSApplicationDelegate {
     weak var state: AppState?
+    weak var updates: OrbitUpdateMonitor?
     var smokeStarted = false
     private var confirmingFanExit = false
     func applicationDidFinishLaunching(_ notification: Notification) { NSApp.activate(ignoringOtherApps: true) }
-    func applicationWillTerminate(_ notification: Notification) { state?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { state?.stop(); updates?.stop() }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let state, state.fanControl.isRunning || !state.fanControl.lastRestoreConfirmed else { return .terminateNow }
         guard !confirmingFanExit else { return .terminateLater }

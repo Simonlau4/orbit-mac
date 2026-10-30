@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: ['Sources/**', 'Resources/**', 'Scripts/**', 'Package.swift', '.github/workflows/release.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          ORBIT_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
+          [[ "$ORBIT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "version=$ORBIT_VERSION" >> "$GITHUB_OUTPUT"
+          if ORBIT_DRAFT=$(gh release view "v$ORBIT_VERSION" --json isDraft --jq '.isDraft' 2>/dev/null); then
+            if [[ "$ORBIT_DRAFT" == true ]]; then
+              echo '已有同版本草稿，请先完成或移除草稿后重试。' >&2
+              exit 1
+            fi
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+            echo '此版本已发布；更新 Info.plist 的版本号后才会发布新包。' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'publish=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Test
+        if: steps.version.outputs.publish == 'true'
+        run: xcrun swift test --scratch-path .build/orbit/build
+      - name: Package universal app
+        if: steps.version.outputs.publish == 'true'
+        run: ./Scripts/package-release.sh
+      - name: Publish preview release
+        if: steps.version.outputs.publish == 'true'
+        env:
+          ORBIT_VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > .build/release-notes.md <<'EOF'
+          通用测试包：macOS 14+，包含 Apple Silicon 和 Intel，附件提供 DMG、ZIP 和 SHA-256 校验值。
+
+          使用 ad-hoc 签名，未通过 Apple 公证。确认来源后，可按 [Apple 官方步骤](https://support.apple.com/102445)在“系统设置 → 隐私与安全性”中选择“仍要打开”。风扇控制和通过管理员组件安装更新不可用。
+
+          Orbit 0.4.4 起支持启动时及运行中每 6 小时检查新版，也可在 Orbit 菜单或设置中手动检查。0.4.3 用户需要先手动升级一次。
+          EOF
+          gh release create "v$ORBIT_VERSION" "dist/Orbit-$ORBIT_VERSION-universal.dmg" "dist/Orbit-$ORBIT_VERSION-universal.zip" dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Orbit $ORBIT_VERSION — 通用测试包（未公证）" --prerelease --latest=false --notes-file .build/release-notes.md --generate-notes

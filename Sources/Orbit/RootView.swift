@@ -8,6 +8,7 @@ struct RootView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            OrbitUpdateBanner()
             Group {
                 switch state.tab {
                 case .clean:

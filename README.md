@@ -18,25 +18,39 @@ Orbit 是使用 SwiftUI 构建的 macOS 磁盘清理与系统监测工具，提�
 
 ## 下载与安装
 
-[下载 0.4.3 DMG](https://github.com/Simonlau4/orbit-mac/releases/download/v0.4.3/Orbit-0.4.3-universal.dmg) · [ZIP](https://github.com/Simonlau4/orbit-mac/releases/download/v0.4.3/Orbit-0.4.3-universal.zip) · [版本说明与校验值](https://github.com/Simonlau4/orbit-mac/releases/tag/v0.4.3)
+[下载 0.4.4 DMG](https://github.com/Simonlau4/orbit-mac/releases/download/v0.4.4/Orbit-0.4.4-universal.dmg) · [ZIP](https://github.com/Simonlau4/orbit-mac/releases/download/v0.4.4/Orbit-0.4.4-universal.zip) · [版本说明与校验值](https://github.com/Simonlau4/orbit-mac/releases/tag/v0.4.4)
 
 从 [Releases](https://github.com/Simonlau4/orbit-mac/releases) 下载 `Orbit-<版本>-universal.dmg`，打开后将 `Orbit.app` 拖入“应用程序”。也可以下载 ZIP，解压后移动应用。通用包包含 Apple Silicon（arm64）和 Intel（x86_64），要求 macOS 14 或更新版本；无需安装 Xcode 或 Swift。
 
-当前 0.4.3 为未公证的预编译测试包，使用 ad-hoc 签名。首次打开若提示无法验证开发者，核对下载来源与下方校验值后，可按 [Apple 官方步骤](https://support.apple.com/102445)在“系统设置 → 隐私与安全性”中选择“仍要打开”。风扇控制和通过 OrbitUpdateAgent 执行的管理员更新需要开发者签名，此测试包不提供这两项能力。
+当前 0.4.4 为未公证的预编译测试包，使用 ad-hoc 签名。首次打开若提示无法验证开发者，核对下载来源与下方校验值后，可按 [Apple 官方步骤](https://support.apple.com/102445)在“系统设置 → 隐私与安全性”中选择“仍要打开”。风扇控制和通过 OrbitUpdateAgent 执行的管理员更新需要开发者签名，此测试包不提供这两项能力。
 
 在下载目录核对附件完整性：
 
 ```sh
-shasum -a 256 Orbit-0.4.3-universal.dmg
+shasum -a 256 Orbit-0.4.4-universal.dmg
 ```
 
 将结果与 Release 附件 `SHA256SUMS.txt` 中对应文件的值比较。若提示应用已损坏或校验值不符，请重新下载。
+
+## Orbit 更新提醒
+
+0.4.4 起，Orbit 在启动时及运行中每 6 小时检查一次 GitHub Releases。有更高版本且安装包已上传时，主窗口显示更新提示，菜单栏也提供新版入口；“Orbit → 检查更新…”和设置中的“检查更新”可随时手动检查。点击“查看新版”打开本仓库的 Release 下载页，由你下载并替换应用。
+
+检查包括已发布的数字版本测试包，不读取普通 Git 提交或草稿 Release。断网或 GitHub 限流时，自动检查不弹窗，手动检查会显示失败状态；扫描与清理仍可离线使用。
+
+已经下载 0.4.3 的用户需要先手动安装一次 0.4.4 或更新版本，之后即可收到应用内更新提示。
+
+### 后续发版
+
+更新 `Resources/Info.plist` 中的 `CFBundleShortVersionString`（如 `0.4.4` → `0.4.5`）和递增的 `CFBundleVersion`，与代码一起提交并推送到 `main`。GitHub Actions 的 `Release` 工作流会运行测试、生成通用 DMG/ZIP 和校验文件，再以 `v<版本号>` 发布未公证测试包。工作流也可从 Actions 页面手动运行。
+
+同一版本已发布时不会覆盖安装包；仅提交代码而不递增版本号，不会触发新的用户更新提示。检查使用 GitHub 的公开接口，无需用户登录或提供令牌。公开分发签名与公证仍需单独配置。
 
 ## 构建与运行
 
 `Package.swift` 声明 Swift tools 5.9，最低运行系统为 macOS 14。构建需要包含 Swift 编译器和 macOS SDK 的 Xcode 或 Command Line Tools；编译器、SDK 应来自匹配的工具链。项目使用系统提供的 AppKit、SwiftUI、SceneKit、IOKit、CryptoKit 和 libarchive，没有第三方包依赖。
 
-0.4.3 的验证环境：
+0.4.4 的验证环境：
 
 | 项目 | 版本 |
 | --- | --- |
@@ -45,7 +59,7 @@ shasum -a 256 Orbit-0.4.3-universal.dmg
 | Apple Swift | 6.3.3（swiftlang-6.3.3.1.3） |
 | macOS SDK | 26.5 |
 
-Intel 架构在此环境交叉编译，尚未在 Intel Mac 上运行验证。仅安装 Command Line Tools 的环境尚未单独验证。
+Intel 架构在此环境交叉编译，图形界面尚未进行 Intel Mac 实机验证。仅安装 Command Line Tools 的环境尚未单独验证。
 
 ```sh
 git clone https://github.com/Simonlau4/orbit-mac.git

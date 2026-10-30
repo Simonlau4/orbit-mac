@@ -3,6 +3,7 @@ import OrbitCore
 
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
+    @EnvironmentObject var updates: OrbitUpdateMonitor
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 23) {
@@ -29,7 +30,15 @@ struct SettingsView: View {
                 HStack {
                     Text("Orbit " + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "开发版")).font(.system(size: 11)).foregroundStyle(OrbitTheme.secondary)
                     Spacer()
+                    if updates.isChecking { ProgressView().controlSize(.mini) }
+                    Button("检查更新") { Task { await updates.check() } }.disabled(updates.isChecking).font(.system(size: 11))
                     Button("纹理来源") { if let url = Bundle.module.url(forResource: "CREDITS", withExtension: "md", subdirectory: "Assets") { reveal(url) } }.buttonStyle(.link).font(.system(size: 11)).foregroundStyle(OrbitTheme.blue)
+                }
+                if !updates.message.isEmpty {
+                    HStack {
+                        Text(updates.message).font(.system(size: 11)).foregroundStyle(OrbitTheme.secondary)
+                        if let release = updates.availableRelease { Link("查看新版", destination: release.url).font(.system(size: 11)) }
+                    }
                 }
             }.padding(28)
         }.frame(minWidth: 470, idealWidth: 500, maxWidth: .infinity, minHeight: 500, idealHeight: 560, maxHeight: .infinity).featureSheet()
