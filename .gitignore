@@ -1,0 +1,13 @@
+.build/
+.swiftpm/
+dist/
+.DS_Store
+*.xcodeproj/
+.env
+.env.*
+*.log
+*.p12
+*.p8
+docs/scan-comparison.*
+docs/scan-preview.png
+docs/reverse-engineering.md
