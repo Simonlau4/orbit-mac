@@ -16,9 +16,36 @@ Orbit 是使用 SwiftUI 构建的 macOS 磁盘清理与系统监测工具，提�
 
 运行要求为 macOS 14 或更新版本。温度传感器与风扇功能取决于硬件支持；风扇控制使用独立的管理员组件。扫描、监测与恢复可离线使用，软件更新检查需要联网。
 
+## 下载与安装
+
+[下载 0.4.3 DMG](https://github.com/Simonlau4/orbit-mac/releases/download/v0.4.3/Orbit-0.4.3-universal.dmg) · [ZIP](https://github.com/Simonlau4/orbit-mac/releases/download/v0.4.3/Orbit-0.4.3-universal.zip) · [版本说明与校验值](https://github.com/Simonlau4/orbit-mac/releases/tag/v0.4.3)
+
+从 [Releases](https://github.com/Simonlau4/orbit-mac/releases) 下载 `Orbit-<版本>-universal.dmg`，打开后将 `Orbit.app` 拖入“应用程序”。也可以下载 ZIP，解压后移动应用。通用包包含 Apple Silicon（arm64）和 Intel（x86_64），要求 macOS 14 或更新版本；无需安装 Xcode 或 Swift。
+
+当前 0.4.3 为未公证的预编译测试包，使用 ad-hoc 签名。首次打开若提示无法验证开发者，核对下载来源与下方校验值后，可按 [Apple 官方步骤](https://support.apple.com/102445)在“系统设置 → 隐私与安全性”中选择“仍要打开”。风扇控制和通过 OrbitUpdateAgent 执行的管理员更新需要开发者签名，此测试包不提供这两项能力。
+
+在下载目录核对附件完整性：
+
+```sh
+shasum -a 256 Orbit-0.4.3-universal.dmg
+```
+
+将结果与 Release 附件 `SHA256SUMS.txt` 中对应文件的值比较。若提示应用已损坏或校验值不符，请重新下载。
+
 ## 构建与运行
 
-需要 Swift 5.9 或更新版本及 macOS SDK，可使用 Xcode 或 Command Line Tools。项目使用系统提供的 AppKit、SwiftUI、SceneKit、IOKit、CryptoKit 和 libarchive，没有第三方包依赖。
+`Package.swift` 声明 Swift tools 5.9，最低运行系统为 macOS 14。构建需要包含 Swift 编译器和 macOS SDK 的 Xcode 或 Command Line Tools；编译器、SDK 应来自匹配的工具链。项目使用系统提供的 AppKit、SwiftUI、SceneKit、IOKit、CryptoKit 和 libarchive，没有第三方包依赖。
+
+0.4.3 的验证环境：
+
+| 项目 | 版本 |
+| --- | --- |
+| 构建与运行系统 | macOS 26.6.1，Apple Silicon |
+| Xcode | 26.6（17F113） |
+| Apple Swift | 6.3.3（swiftlang-6.3.3.1.3） |
+| macOS SDK | 26.5 |
+
+Intel 架构在此环境交叉编译，尚未在 Intel Mac 上运行验证。仅安装 Command Line Tools 的环境尚未单独验证。
 
 ```sh
 git clone https://github.com/Simonlau4/orbit-mac.git
@@ -29,6 +56,14 @@ open dist/Orbit.app
 
 构建产物位于 `dist/Orbit.app`，中间文件默认位于 `.build/orbit`。可通过 `ORBIT_RUNTIME` 指定构建目录。
 
+脚本使用 `xcrun swift`，跟随 `xcode-select` 或 `DEVELOPER_DIR` 选中的工具链。需要生成通用包时，使用完整 Xcode：
+
+```sh
+./Scripts/package-release.sh
+```
+
+该命令构建 arm64 与 x86_64，验证应用签名和架构，并在 `dist` 下生成 DMG、ZIP 和 `SHA256SUMS.txt`；中间文件位于 `.build/orbit-release`。脚本只生成本地附件，不会上传或公证。
+
 默认使用 ad-hoc 签名。启用风扇控制等需要校验开发者身份的功能时，使用本机钥匙串中的签名身份构建：
 
 ```sh
@@ -36,6 +71,40 @@ ORBIT_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" ./Scripts/build.sh
 ```
 
 将应用复制到 `~/Applications` 或 `/Applications` 后即可启动。关闭窗口后仍可从菜单栏打开，退出入口也在菜单栏。
+
+公开分发并通过 macOS 默认安全检查的版本需要 Developer ID Application 签名和 Apple 公证；Apple Development 签名用于开发测试。参见 [Apple 签名与公证说明](https://developer.apple.com/developer-id/)。
+
+### 构建排障
+
+遇到 `Failed to build module`、`compiled with a different version` 或 `import Foundation` 失败时，先记录完整报错并检查当前工具链：
+
+```sh
+xcode-select -p
+xcrun --find swift
+xcrun swift --version
+xcrun --sdk macosx --show-sdk-path
+xcrun swift -e 'import Foundation; print("Foundation OK")'
+```
+
+若最小 Foundation 检查也失败，应先排查工具链、SDK 和模块缓存；仅凭 Swift 构建号尾数不同，无法确认是系统目录中的旧模块残留。
+
+1. 已安装完整 Xcode 时，可只为本次构建选择它，避免改变系统全局配置：
+
+   ```sh
+   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./Scripts/build.sh
+   ```
+
+   若终端设置过 `SDKROOT` 或 `TOOLCHAINS`，检查它们是否指向其他版本；移除这些覆盖后重试。
+
+2. 尚未安装开发工具时运行 `xcode-select --install`。已安装 Command Line Tools 时，通过“系统设置 → 通用 → 软件更新”更新，或从 [Apple Developer Downloads](https://developer.apple.com/download/more/) 安装与当前 macOS 匹配的版本。更新方式见 [Apple 官方说明](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools/)。
+
+3. 工具链已匹配但仍有旧构建缓存报错时，使用新的项目构建目录重试：
+
+   ```sh
+   ORBIT_RUNTIME="$(mktemp -d "${TMPDIR:-/tmp}/orbit-build.XXXXXX")" ./Scripts/build.sh
+   ```
+
+以上步骤不需要删除 `/Library/Developer/CommandLineTools` 或修改 SDK 内部文件。仍失败时，请在 Issue 中附上完整错误及上述环境输出。
 
 ## 清理与恢复
 
@@ -73,7 +142,7 @@ ORBIT_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" ./Scripts/build.sh
 ## 测试
 
 ```sh
-swift test --scratch-path .build/orbit/build
+xcrun swift test --scratch-path .build/orbit/build
 ```
 
 测试使用独立 fixture，覆盖扫描范围、选择策略、文件变化、恢复冲突、更新安装、启动项与管理员组件校验。
